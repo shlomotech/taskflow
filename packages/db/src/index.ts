@@ -1,2 +1,1 @@
-export * from "./schema";
-export { db } from "./client";
+export { db, Prisma, PrismaClient } from "./client.js";

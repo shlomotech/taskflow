@@ -12,21 +12,21 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "type-check": "tsc --noEmit",
+    "build": "prisma generate && tsc",
+    "type-check": "prisma generate && tsc --noEmit",
     "lint": "eslint src",
     "test": "echo 'No tests'",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
-    "drizzle-orm": "^0.30.0",
-    "postgres": "^3.4.0"
+    "@prisma/client": "^6.7.0"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.21.0",
+    "prisma": "^6.7.0",
     "typescript": "^5.4.5"
   }
 }
