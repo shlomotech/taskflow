@@ -5,14 +5,26 @@ import { loadEnv, type AppEnv } from "./config/env.js";
 import { registerErrorHandler } from "./lib/errors.js";
 import { createDatabasePool } from "./lib/db.js";
 import authRoutes from "./routes/auth.js";
+import labelRoutes from "./routes/labels.js";
+import taskRoutes from "./routes/tasks.js";
 import {
   PostgresAuthService,
   type AuthService,
 } from "./services/auth-service.js";
+import {
+  PostgresLabelService,
+  type LabelService,
+} from "./services/label-service.js";
+import {
+  PostgresTaskService,
+  type TaskService,
+} from "./services/task-service.js";
 
 export interface BuildServerOptions {
   env?: AppEnv;
   authService?: AuthService;
+  taskService?: TaskService;
+  labelService?: LabelService;
 }
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
@@ -21,11 +33,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     logger: env.NODE_ENV !== "test",
   });
 
-  const databasePool = options.authService
-    ? null
-    : createDatabasePool(env.DATABASE_URL);
+  const databasePool =
+    options.authService && options.taskService && options.labelService
+      ? null
+      : createDatabasePool(env.DATABASE_URL);
   const authService =
     options.authService ?? new PostgresAuthService(databasePool!);
+  const taskService =
+    options.taskService ?? new PostgresTaskService(databasePool!);
+  const labelService =
+    options.labelService ?? new PostgresLabelService(databasePool!);
 
   server.register(cors, {
     credentials: true,
@@ -42,6 +59,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     prefix: "/api/v1/auth",
     authService,
     env,
+  });
+
+  server.register(taskRoutes, {
+    prefix: "/api/v1",
+    taskService,
+  });
+
+  server.register(labelRoutes, {
+    prefix: "/api/v1",
+    labelService,
   });
 
   if (databasePool) {
