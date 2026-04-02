@@ -1,5 +1,5 @@
-// TaskFlow Frontend — stub entrypoint
-// Full implementation in Phase 3
+import { redirect } from 'next/navigation';
+
 export default function Home() {
-  return <main>TaskFlow</main>;
+  redirect('/dashboard');
 }
