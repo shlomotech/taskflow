@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
-    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "lint": "eslint \"{apps,packages}/*/src/**/*.{ts,tsx}\"",
     "type-check": "npm run type-check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\""
+    "format": "prettier --write \"{apps,packages}/*/src/**/*.{ts,tsx}\""
   },
   "devDependencies": {
+    "@types/node": "^20.14.2",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
