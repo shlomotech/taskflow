@@ -194,7 +194,7 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
   }
 
   function handleCardClick(taskId: string) {
-    router.push(`/tasks/${taskId}`);
+    router.push(`/projects/${projectId}/tasks/${taskId}`);
   }
 
   if (isLoading) {
