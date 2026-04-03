@@ -1,0 +1,14 @@
+{
+  "name": "taskflow",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @taskflow/api dev",
+    "dev:web": "pnpm --filter @taskflow/web dev",
+    "dev": "pnpm run --parallel dev:api dev:web",
+    "build": "pnpm --filter @taskflow/shared build && pnpm run --parallel build:api build:web",
+    "build:api": "pnpm --filter @taskflow/api build",
+    "build:web": "pnpm --filter @taskflow/web build",
+    "db:generate": "pnpm --filter @taskflow/api db:generate",
+    "db:migrate": "pnpm --filter @taskflow/api db:migrate"
+  }
+}
