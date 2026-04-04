@@ -11,17 +11,26 @@
     "pretype-check": "npm --prefix ../.. run build --workspace=@taskflow/shared",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate-run.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
     "@fastify/helmet": "^13.0.2",
     "@fastify/jwt": "^8.0.1",
     "@taskflow/shared": "file:../../packages/shared",
+    "bcrypt": "^5.1.1",
+    "drizzle-orm": "^0.31.4",
     "fastify": "^4.27.0",
+    "fastify-plugin": "^4.5.1",
+    "postgres": "^3.4.4",
+    "socket.io": "^4.7.5",
     "zod": "^3.23.5"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "drizzle-kit": "^0.22.8",
     "tsx": "^4.11.0",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
