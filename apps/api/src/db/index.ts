@@ -7,3 +7,4 @@ const client = postgres(connectionString);
 
 export const db = drizzle(client, { schema });
 export { schema };
+export type { InferSelectModel, InferInsertModel } from "drizzle-orm";
