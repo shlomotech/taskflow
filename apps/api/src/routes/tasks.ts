@@ -1,103 +1,105 @@
-import { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
-import { nanoid } from "nanoid";
-import { db, schema } from "../db/index.js";
-import type { CreateTaskInput, UpdateTaskInput } from "@taskflow/shared";
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { authenticate } from '../middleware/authenticate.js';
+import {
+  assignTask,
+  createTask,
+  deleteTask,
+  getTask,
+  listTasks,
+  unassignTask,
+  updateTask,
+} from '../services/tasks.service.js';
 
-export async function taskRoutes(app: FastifyInstance) {
-  // List tasks
-  app.get("/api/tasks", async (request, reply) => {
-    const { status, priority } = request.query as {
-      status?: string;
-      priority?: string;
-    };
+const createBody = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().optional(),
+  status: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done']).optional(),
+  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  assigneeId: z.string().uuid().optional(),
+  dueDate: z.coerce.date().optional(),
+});
 
-    let query = db.select().from(schema.tasks).$dynamic();
+const updateBody = z.object({
+  title: z.string().min(1).max(255).optional(),
+  description: z.string().nullable().optional(),
+  status: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done']).optional(),
+  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  assigneeId: z.string().uuid().nullable().optional(),
+  dueDate: z.coerce.date().nullable().optional(),
+  position: z.number().optional(),
+});
 
-    if (status) {
-      query = query.where(
-        eq(schema.tasks.status, status as "todo" | "in_progress" | "done")
-      );
-    }
-    if (priority) {
-      query = query.where(
-        eq(
-          schema.tasks.priority,
-          priority as "low" | "medium" | "high" | "critical"
-        )
-      );
-    }
+const assignBody = z.object({
+  userId: z.string().uuid(),
+});
 
-    const tasks = await query;
-    return tasks;
+export const tasksRoutes: FastifyPluginAsync = async (app) => {
+  app.addHook('preHandler', authenticate);
+
+  app.get<{
+    Params: { projectId: string };
+    Querystring: { status?: string; priority?: string; assigneeId?: string };
+  }>('/projects/:projectId/tasks', async (request) => {
+    const tasks = await listTasks(app.db, request.params.projectId, request.query);
+    return { data: tasks };
   });
 
-  // Get task
-  app.get("/api/tasks/:id", async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const [task] = await db
-      .select()
-      .from(schema.tasks)
-      .where(eq(schema.tasks.id, id));
-    if (!task) {
-      return reply.status(404).send({ error: "Task not found" });
-    }
-    return task;
-  });
+  app.post<{ Params: { projectId: string } }>(
+    '/projects/:projectId/tasks',
+    async (request, reply) => {
+      const body = createBody.parse(request.body);
+      const task = await createTask(app.db, request.params.projectId, request.user.sub, body);
+      app.io.to(`board:${request.params.projectId}`).emit('issue:created', task);
+      return reply.status(201).send({ data: task });
+    },
+  );
 
-  // Create task
-  app.post("/api/tasks", async (request, reply) => {
-    const input = request.body as CreateTaskInput;
-    const id = nanoid();
-    const now = new Date();
+  app.get<{ Params: { projectId: string; taskId: string } }>(
+    '/projects/:projectId/tasks/:taskId',
+    async (request) => {
+      const task = await getTask(app.db, request.params.taskId);
+      return { data: task };
+    },
+  );
 
-    const [task] = await db
-      .insert(schema.tasks)
-      .values({
-        id,
-        title: input.title,
-        description: input.description ?? null,
-        status: input.status ?? "todo",
-        priority: input.priority ?? "medium",
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
+  app.patch<{ Params: { projectId: string; taskId: string } }>(
+    '/projects/:projectId/tasks/:taskId',
+    async (request) => {
+      const body = updateBody.parse(request.body);
+      const task = await updateTask(app.db, request.params.taskId, body);
+      app.io.to(`board:${request.params.projectId}`).emit('issue:updated', task);
+      return { data: task };
+    },
+  );
 
-    return reply.status(201).send(task);
-  });
+  app.delete<{ Params: { projectId: string; taskId: string } }>(
+    '/projects/:projectId/tasks/:taskId',
+    async (request, reply) => {
+      await deleteTask(app.db, request.params.taskId);
+      app.io
+        .to(`board:${request.params.projectId}`)
+        .emit('issue:deleted', { id: request.params.taskId });
+      return reply.status(204).send();
+    },
+  );
 
-  // Update task
-  app.patch("/api/tasks/:id", async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const input = request.body as UpdateTaskInput;
+  app.post<{ Params: { projectId: string; taskId: string } }>(
+    '/projects/:projectId/tasks/:taskId/assignments',
+    async (request) => {
+      const { userId } = assignBody.parse(request.body);
+      const task = await assignTask(app.db, request.params.taskId, userId);
+      app.io.to(`board:${request.params.projectId}`).emit('issue:updated', task);
+      return { data: task };
+    },
+  );
 
-    const [task] = await db
-      .update(schema.tasks)
-      .set({
-        ...input,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.tasks.id, id))
-      .returning();
-
-    if (!task) {
-      return reply.status(404).send({ error: "Task not found" });
-    }
-    return task;
-  });
-
-  // Delete task
-  app.delete("/api/tasks/:id", async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const [task] = await db
-      .delete(schema.tasks)
-      .where(eq(schema.tasks.id, id))
-      .returning();
-
-    if (!task) {
-      return reply.status(404).send({ error: "Task not found" });
-    }
-    return reply.status(204).send();
-  });
-}
+  app.delete<{ Params: { projectId: string; taskId: string } }>(
+    '/projects/:projectId/tasks/:taskId/assignments',
+    async (request) => {
+      const task = await unassignTask(app.db, request.params.taskId);
+      app.io.to(`board:${request.params.projectId}`).emit('issue:updated', task);
+      return { data: task };
+    },
+  );
+};

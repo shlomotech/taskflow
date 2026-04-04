@@ -1,10 +1,12 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import * as schema from "./schema.js";
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import * as schema from './schema/index.js';
 
-const connectionString = process.env.DATABASE_URL!;
-const client = postgres(connectionString);
+export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
-export const db = drizzle(client, { schema });
+export function createDb(databaseUrl: string, maxConnections = 5): Database {
+  const sql = postgres(databaseUrl, { max: maxConnections });
+  return drizzle(sql, { schema });
+}
+
 export { schema };
-export type { InferSelectModel, InferInsertModel } from "drizzle-orm";

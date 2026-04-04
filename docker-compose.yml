@@ -1,38 +1,60 @@
-version: "3.9"
-
 services:
-  postgres:
+  db:
     image: postgres:16-alpine
+    container_name: taskflow_db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: taskflow
+      POSTGRES_DB: ${POSTGRES_DB:-taskflow}
+      POSTGRES_USER: ${POSTGRES_USER:-taskflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskflow_dev}
     ports:
-      - "5432:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-taskflow} -d ${POSTGRES_DB:-taskflow}']
+      interval: 10s
       timeout: 5s
       retries: 5
 
-  postgres_test:
-    image: postgres:16-alpine
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: taskflow_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: taskflow_test
+      NODE_ENV: development
+      DATABASE_URL: postgres://${POSTGRES_USER:-taskflow}:${POSTGRES_PASSWORD:-taskflow_dev}@db:5432/${POSTGRES_DB:-taskflow}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_prod}
+      PORT: 3001
     ports:
-      - "5433:5432"
+      - '3001:3001'
     volumes:
-      - pgdata_test:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./packages/backend/src:/app/src
+    profiles:
+      - full
+
+  frontend:
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile
+    container_name: taskflow_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./packages/frontend/src:/app/src
+    profiles:
+      - full
 
 volumes:
-  pgdata:
-  pgdata_test:
+  postgres_data:
+    driver: local
